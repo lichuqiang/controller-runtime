@@ -19,7 +19,6 @@ package source
 import (
 	"fmt"
 
-	"github.com/kubernetes-sigs/controller-runtime/pkg/controller/event"
 	"github.com/kubernetes-sigs/controller-runtime/pkg/controller/eventhandler"
 	"github.com/kubernetes-sigs/controller-runtime/pkg/controller/source/internal"
 	"github.com/kubernetes-sigs/controller-runtime/pkg/internal/informer"
@@ -40,21 +39,7 @@ type Source interface {
 	Start(eventhandler.EventHandler, workqueue.RateLimitingInterface) error
 }
 
-// ChannelSource is used to provide a source of events originating outside the cluster
-// (eh.g. GitHub Webhook callback).  ChannelSource requires the user to wire the external
-// source (eh.g. http handler) to write GenericEvents to the underlying channel.
-type ChannelSource chan event.GenericEvent
-
-var _ Source = ChannelSource(make(chan event.GenericEvent))
-
-// Start implements Source and should only be called by the Controller.
-func (ks ChannelSource) Start(
-	handler eventhandler.EventHandler,
-	queue workqueue.RateLimitingInterface) error {
-	return nil
-}
-
-var log = logf.KBLog.WithName("source").WithName("KindSource")
+var ksLog = logf.KBLog.WithName("source").WithName("KindSource")
 
 // KindSource is used to provide a source of events originating inside the cluster from Watches (eh.g. Pod Create)
 type KindSource struct {

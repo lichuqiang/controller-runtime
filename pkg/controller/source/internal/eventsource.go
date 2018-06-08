@@ -21,6 +21,7 @@ import (
 
 	"github.com/kubernetes-sigs/controller-runtime/pkg/controller/event"
 	"github.com/kubernetes-sigs/controller-runtime/pkg/controller/eventhandler"
+	"github.com/kubernetes-sigs/controller-runtime/pkg/controller/source"
 	logf "github.com/kubernetes-sigs/controller-runtime/pkg/runtime/log"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -154,4 +155,18 @@ func (e EventHandler) OnDelete(obj interface{}) {
 
 	// Invoke delete handler
 	e.EventHandler.Delete(e.Queue, c)
+}
+
+var _ source.ChannelEventHandler = EventHandler{}
+
+// OnGenetic pass through the GenericEvent and calls Generic on EventHandler
+func (e EventHandler) OnGeneric(obj interface{}) {
+	c, ok := obj.(event.GenericEvent)
+	if !ok {
+		log.Error(nil, "OnGeneric invalid event type", "Event", obj)
+		return
+	}
+
+	// Invoke generic handler
+	e.EventHandler.Generic(e.Queue, c)
 }

@@ -18,6 +18,7 @@ package inject
 
 import (
 	"github.com/kubernetes-sigs/controller-runtime/pkg/client"
+	"github.com/kubernetes-sigs/controller-runtime/pkg/controller/source"
 	"github.com/kubernetes-sigs/controller-runtime/pkg/internal/informer"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
@@ -79,6 +80,20 @@ type Scheme interface {
 func InjectScheme(scheme *runtime.Scheme, i interface{}) (bool, error) {
 	if is, ok := i.(Scheme); ok {
 		return true, is.InjectScheme(scheme)
+	}
+	return false, nil
+}
+
+// ChannelInformer is used by the ControllerManager to inject ChannelSourceInformer into Sources
+type ChannelInformer interface {
+	InjectChannelInformer(informer *source.ChannelSourceInformer) error
+}
+
+// InjectChannelInformer will set ChannelSourceInformer on i and return the result if it implements ChannelInformer.
+// Returns false if i does not implement ChannelInformer.
+func InjectChannelInformer(informer *source.ChannelSourceInformer, i interface{}) (bool, error) {
+	if is, ok := i.(ChannelInformer); ok {
+		return true, is.InjectChannelInformer(informer)
 	}
 	return false, nil
 }

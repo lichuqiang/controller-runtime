@@ -22,7 +22,9 @@ import (
 
 	"github.com/kubernetes-sigs/controller-runtime/pkg/client"
 	"github.com/kubernetes-sigs/controller-runtime/pkg/client/config"
+	"github.com/kubernetes-sigs/controller-runtime/pkg/controller/event"
 	"github.com/kubernetes-sigs/controller-runtime/pkg/controller/reconcile"
+	"github.com/kubernetes-sigs/controller-runtime/pkg/controller/source"
 	"github.com/kubernetes-sigs/controller-runtime/pkg/internal/apiutil"
 	"github.com/kubernetes-sigs/controller-runtime/pkg/internal/informer"
 	"github.com/kubernetes-sigs/controller-runtime/pkg/runtime/inject"
@@ -73,6 +75,10 @@ type controllerManager struct {
 
 	// informers are injected into Controllers (,and transitively EventHandlers, Sources and Predicates).
 	informers informer.Informers
+
+	// outerInformer iseused to receive events originating outside the cluster (e.g. GitHub Webhook callback)
+	// TODO: revisit the part if we need to watch more than one channel
+	outerInformer *source.ChannelSourceInformer
 
 	// TODO(directxman12): Provide an escape hatch to get individual indexers
 	// client is the client injected into Controllers (and EventHandlers, Sources and Predicates).
@@ -139,6 +145,9 @@ func (cm *controllerManager) injectInto(i interface{}) error {
 	if _, err := inject.InjectInformers(cm.informers, i); err != nil {
 		return err
 	}
+	if _, err := inject.InjectChannelInformer(cm.outerInformer, i); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -165,6 +174,9 @@ func (cm *controllerManager) Start(stop <-chan struct{}) error {
 	// Start the Informers.
 	cm.stop = stop
 	cm.informers.Start(stop)
+
+	// Start the outer informer
+	cm.outerInformer.Run(stop)
 
 	// Start the controllers after the promises
 	for _, c := range cm.controllers {
@@ -199,6 +211,9 @@ type ControllerManagerArgs struct {
 	// Scheme is the scheme used to resolve runtime.Objects to GroupVersionKinds / Resources
 	// Defaults to the kubernetes/client-go scheme.Scheme
 	Scheme *runtime.Scheme
+
+	// used to receive events originating outside the cluster (e.g. GitHub Webhook callback)
+	outerChan chan event.GenericEvent
 }
 
 // NewControllerManager returns a new fully initialized ControllerManager.
@@ -225,6 +240,7 @@ func NewControllerManager(args ControllerManagerArgs) (ControllerManager, error)
 	}
 	cm.informers = spi
 	cm.informers.InformerFor(&v1.Deployment{})
+	cm.outerInformer = source.NewChannelSourceInformer(args.outerChan)
 
 	// Inject a Read / Write client into all controllers
 	// TODO(directxman12): Figure out how to allow users to request a client without requesting a watch
