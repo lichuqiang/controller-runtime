@@ -82,3 +82,18 @@ func DoScheme(scheme *runtime.Scheme, i interface{}) (bool, error) {
 	}
 	return false, nil
 }
+
+// Stop is used by the ControllerManager to inject stop channel into Sources, EventHandlers, Predicates, and
+// Reconciles
+type Stop interface {
+	InjectStop(<-chan struct{}) error
+}
+
+// DoStop will set stop channel on i and return the result if it implements Stop.
+// Returns false if i does not implement Stop.
+func DoStop(stop <-chan struct{}, i interface{}) (bool, error) {
+	if s, ok := i.(Stop); ok {
+		return true, s.InjectStop(stop)
+	}
+	return false, nil
+}

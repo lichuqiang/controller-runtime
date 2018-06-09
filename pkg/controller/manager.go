@@ -139,6 +139,9 @@ func (cm *controllerManager) injectInto(i interface{}) error {
 	if _, err := inject.DoInformers(cm.informers, i); err != nil {
 		return err
 	}
+	if _, err := inject.DoStop(cm.stop, i); err != nil {
+		return err
+	}
 	return nil
 }
 

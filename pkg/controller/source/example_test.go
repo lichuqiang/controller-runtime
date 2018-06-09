@@ -41,7 +41,7 @@ func ExampleChannelSource() {
 	events := make(chan event.GenericEvent)
 
 	ctrl.Watch(
-		source.ChannelSource(events),
+		&source.ChannelSource{Source: events},
 		&eventhandler.EnqueueHandler{},
 	)
 }
