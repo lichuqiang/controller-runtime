@@ -83,17 +83,17 @@ func DoScheme(scheme *runtime.Scheme, i interface{}) (bool, error) {
 	return false, nil
 }
 
-// Stop is used by the ControllerManager to inject stop channel into Sources, EventHandlers, Predicates, and
-// Reconciles
-type Stop interface {
-	InjectStop(<-chan struct{}) error
+// Stoppable is used by the ControllerManager to inject stop channel into Sources,
+// EventHandlers, Predicates, and Reconciles.
+type Stoppable interface {
+	InjectStopChannel(<-chan struct{}) error
 }
 
-// DoStop will set stop channel on i and return the result if it implements Stop.
-// Returns false if i does not implement Stop.
-func DoStop(stop <-chan struct{}, i interface{}) (bool, error) {
-	if s, ok := i.(Stop); ok {
-		return true, s.InjectStop(stop)
+// DoStopChannel will set stop channel on i and return the result if it implements Stoppable.
+// Returns false if i does not implement Stoppable.
+func DoStopChannel(stop <-chan struct{}, i interface{}) (bool, error) {
+	if s, ok := i.(Stoppable); ok {
+		return true, s.InjectStopChannel(stop)
 	}
 	return false, nil
 }

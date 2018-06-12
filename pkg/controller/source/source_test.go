@@ -18,8 +18,6 @@ package source_test
 
 import (
 	"fmt"
-	"time"
-
 	"github.com/kubernetes-sigs/controller-runtime/pkg/controller/event"
 	"github.com/kubernetes-sigs/controller-runtime/pkg/controller/eventhandler"
 	"github.com/kubernetes-sigs/controller-runtime/pkg/controller/source"
@@ -234,7 +232,7 @@ var _ = Describe("Source", func() {
 
 				q := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "test")
 				instance := &source.ChannelSource{Source: ch}
-				inject.DoStop(stop, instance)
+				inject.DoStopChannel(stop, instance)
 				err := instance.Start(eventhandler.Funcs{
 					CreateFunc: func(workqueue.RateLimitingInterface, event.CreateEvent) {
 						defer GinkgoRecover()
@@ -262,16 +260,18 @@ var _ = Describe("Source", func() {
 				<-c
 				close(done)
 			})
-			It("should block if exceed buffer size", func(done Done) {
+			It("should get pending events processed once channel unblocked", func(done Done) {
 				ch := make(chan event.GenericEvent)
+				unblock := make(chan struct{})
+				processed := make(chan struct{})
 				evt := event.GenericEvent{}
-				interval := 5 * time.Second
+				eventCount := 0
 
 				q := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "test")
 				// Add a handler to get distribution blocked
 				instance := &source.ChannelSource{Source: ch}
 				instance.DestBufferSize = 1
-				inject.DoStop(stop, instance)
+				inject.DoStopChannel(stop, instance)
 				err := instance.Start(eventhandler.Funcs{
 					CreateFunc: func(workqueue.RateLimitingInterface, event.CreateEvent) {
 						defer GinkgoRecover()
@@ -287,27 +287,43 @@ var _ = Describe("Source", func() {
 					},
 					GenericFunc: func(q2 workqueue.RateLimitingInterface, evt event.GenericEvent) {
 						defer GinkgoRecover()
-						time.Sleep(interval)
+						// Block for the first time
+						if eventCount == 0 {
+							<-unblock
+						}
+						eventCount += 1
+
+						if eventCount == 3 {
+							close(processed)
+						}
 					},
 				}, q)
 				Expect(err).NotTo(HaveOccurred())
 
-				// get channel blocked
+				// Write 3 events into the source channel.
+				// The 1st should be passed into the generic func of the handler;
+				// The 2nd should be fetched out of the source channel, and waiting to write into dest channel;
+				// The 3rd should be pending in the source channel.
 				ch <- evt
 				ch <- evt
 				ch <- evt
 
-				beforeEvent := time.Now()
-				ch <- evt
-				// validate event distribution get blocked.
-				distributeInterval := time.Now().Sub(beforeEvent)
-				Expect(distributeInterval >= interval).To(BeTrue())
+				// Validate none of the events have been processed.
+				Expect(eventCount).To(Equal(0))
+
+				close(unblock)
+
+				<-processed
+
+				// Validate all of the events have been processed.
+				Expect(eventCount).To(Equal(3))
+
 				close(done)
-			}, 15)
+			})
 			It("should get error if no source specified", func(done Done) {
 				q := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "test")
 				instance := &source.ChannelSource{ /*no source specified*/ }
-				inject.DoStop(stop, instance)
+				inject.DoStopChannel(stop, instance)
 				err := instance.Start(eventhandler.Funcs{}, q)
 				Expect(err).To(Equal(fmt.Errorf("must specify ChannelSource.Source")))
 				close(done)
@@ -338,7 +354,7 @@ var _ = Describe("Source", func() {
 
 				q := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "test")
 				instance := &source.ChannelSource{Source: ch}
-				inject.DoStop(stop, instance)
+				inject.DoStopChannel(stop, instance)
 				err := instance.Start(eventhandler.Funcs{
 					CreateFunc: func(workqueue.RateLimitingInterface, event.CreateEvent) {
 						defer GinkgoRecover()

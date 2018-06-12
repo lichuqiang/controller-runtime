@@ -78,11 +78,11 @@ type ChannelSource struct {
 	destLock sync.Mutex
 }
 
-var _ inject.Stop = &ChannelSource{}
+var _ inject.Stoppable = &ChannelSource{}
 
-// InjectStop is internal should be called only by the Controller.
+// InjectStopChannel is internal should be called only by the Controller.
 // It is used to inject the stop channel initialized by the ControllerManager.
-func (cs *ChannelSource) InjectStop(stop <-chan struct{}) error {
+func (cs *ChannelSource) InjectStopChannel(stop <-chan struct{}) error {
 	if cs.stop == nil {
 		cs.stop = stop
 	}
